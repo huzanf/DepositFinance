@@ -1,0 +1,4 @@
+/config/config.php
+/storage/*.log
+.DS_Store
+*.swp
