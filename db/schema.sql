@@ -2,11 +2,29 @@
 -- Import this via phpMyAdmin (or `mysql depositfinance < db/schema.sql`)
 -- after creating an empty database named to match config/config.php.
 
+CREATE TABLE IF NOT EXISTS members (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    notes VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS goals (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    target_amount DECIMAL(14,2) NULL,
+    notes VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS instruments (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     type ENUM('FD', 'RD', 'SIP') NOT NULL,
     name VARCHAR(150) NOT NULL,
     institution VARCHAR(150) NOT NULL,
+    account_number VARCHAR(100) NULL COMMENT 'Bank/folio-issued RD, FD or SIP account number',
+    member_id INT UNSIGNED NULL COMMENT 'Which family member this belongs to',
+    goal_id INT UNSIGNED NULL COMMENT 'What this deposit is earmarked for',
     start_date DATE NOT NULL,
     maturity_date DATE NULL,
     interest_rate DECIMAL(5,2) NULL COMMENT 'Annual %, for FD/RD. Optional expected return for SIP.',
@@ -14,10 +32,19 @@ CREATE TABLE IF NOT EXISTS instruments (
     principal_amount DECIMAL(14,2) NULL COMMENT 'Lump sum, for FD',
     installment_amount DECIMAL(14,2) NULL COMMENT 'Recurring amount, for RD/SIP',
     frequency ENUM('monthly', 'quarterly', 'yearly', 'one-time') NOT NULL DEFAULT 'monthly',
-    status ENUM('active', 'matured', 'closed') NOT NULL DEFAULT 'active',
+    tenure_months INT UNSIGNED NULL,
+    maturity_amount DECIMAL(14,2) NULL COMMENT 'Expected/actual payout at maturity, as stated by the bank',
+    status ENUM('active', 'matured', 'renewed', 'closed') NOT NULL DEFAULT 'active',
+    renewed_from_id INT UNSIGNED NULL COMMENT 'Predecessor instrument this one renews, if any',
     notes TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL,
+    FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE SET NULL,
+    FOREIGN KEY (renewed_from_id) REFERENCES instruments(id) ON DELETE SET NULL,
+    INDEX idx_instruments_member (member_id),
+    INDEX idx_instruments_goal (goal_id),
+    INDEX idx_instruments_renewed_from (renewed_from_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -40,6 +67,15 @@ CREATE TABLE IF NOT EXISTS valuations (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (instrument_id) REFERENCES instruments(id) ON DELETE CASCADE,
     INDEX idx_valuations_instrument (instrument_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS reminders_sent (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    instrument_id INT UNSIGNED NOT NULL,
+    threshold_days INT NOT NULL COMMENT '60, 30, 7 or 0 (0 = due on maturity day)',
+    sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (instrument_id) REFERENCES instruments(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_instrument_threshold (instrument_id, threshold_days)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS otp_codes (

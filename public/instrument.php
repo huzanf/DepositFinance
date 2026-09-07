@@ -4,6 +4,8 @@ require __DIR__ . '/../src/bootstrap.php';
 
 use DepositFinance\Auth;
 use DepositFinance\Instrument;
+use DepositFinance\Member;
+use DepositFinance\Goal;
 use DepositFinance\TransactionRepo;
 use DepositFinance\ValuationRepo;
 use DepositFinance\Calculations;
@@ -88,6 +90,11 @@ $gainPct = $netInvested > 0 ? ($gain / $netInvested) * 100 : 0;
 $cashflows = Calculations::buildCashflows($transactions, $current['value']);
 $xirr = Calculations::xirr($cashflows);
 
+$member = $instrument['member_id'] ? Member::find((int) $instrument['member_id']) : null;
+$goal = $instrument['goal_id'] ? Goal::find((int) $instrument['goal_id']) : null;
+$renewedFrom = $instrument['renewed_from_id'] ? Instrument::find((int) $instrument['renewed_from_id']) : null;
+$renewedTo = Instrument::findSuccessorOf($id);
+
 $pageTitle = $instrument['name'];
 $activeNav = 'instruments';
 require __DIR__ . '/partials/header.php';
@@ -103,6 +110,9 @@ require __DIR__ . '/partials/header.php';
         <div class="muted"><?= e($instrument['institution']) ?></div>
     </div>
     <div>
+        <?php if ($instrument['status'] !== 'renewed' && !$renewedTo): ?>
+            <a href="<?= base_url('instrument_form.php?renew_from=' . $id) ?>" class="btn btn-secondary">Renew</a>
+        <?php endif; ?>
         <a href="<?= base_url('instrument_form.php?id=' . $id) ?>" class="btn btn-secondary">Edit</a>
         <form method="post" class="inline" onsubmit="return confirm('Delete this instrument and all its transactions/valuations? This cannot be undone.');">
             <?= csrf_field() ?>
@@ -111,6 +121,17 @@ require __DIR__ . '/partials/header.php';
         </form>
     </div>
 </div>
+
+<?php if ($renewedFrom || $renewedTo): ?>
+    <div class="card" style="padding:12px 20px; background:#f7f9fc;">
+        <?php if ($renewedFrom): ?>
+            <div>Renewed from <a href="<?= base_url('instrument.php?id=' . $renewedFrom['id']) ?>"><?= e($renewedFrom['name']) ?></a></div>
+        <?php endif; ?>
+        <?php if ($renewedTo): ?>
+            <div>Renewed into <a href="<?= base_url('instrument.php?id=' . $renewedTo['id']) ?>"><?= e($renewedTo['name']) ?></a></div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
 
 <div class="grid grid-4">
     <div class="stat">
@@ -141,12 +162,17 @@ require __DIR__ . '/partials/header.php';
 <div class="card">
     <h2>Details</h2>
     <dl class="detail-grid">
+        <dt>Account / RD / folio number</dt><dd><?= !empty($instrument['account_number']) ? e($instrument['account_number']) : '—' ?></dd>
+        <dt>Member</dt><dd><?= $member ? e($member['name']) : '—' ?></dd>
+        <dt>Goal</dt><dd><?= $goal ? e($goal['name']) : '—' ?></dd>
+        <dt>Tenure</dt><dd><?= $instrument['tenure_months'] !== null ? e($instrument['tenure_months']) . ' months' : '—' ?></dd>
         <dt>Start date</dt><dd><?= e(date('d M Y', strtotime($instrument['start_date']))) ?></dd>
         <dt>Maturity date</dt><dd><?= $instrument['maturity_date'] ? e(date('d M Y', strtotime($instrument['maturity_date']))) : '—' ?></dd>
         <dt>Interest rate / expected return</dt><dd><?= $instrument['interest_rate'] !== null ? e($instrument['interest_rate']) . '% p.a.' : '—' ?></dd>
         <dt>Compounding</dt><dd><?= $instrument['compounding_frequency'] ? ucfirst($instrument['compounding_frequency']) : '—' ?></dd>
         <dt>Principal / lump sum</dt><dd><?= $instrument['principal_amount'] !== null ? money((float) $instrument['principal_amount']) : '—' ?></dd>
         <dt>Recurring installment</dt><dd><?= $instrument['installment_amount'] !== null ? money((float) $instrument['installment_amount']) . ' / ' . $instrument['frequency'] : '—' ?></dd>
+        <dt>Maturity amount (bank-quoted)</dt><dd><?= $instrument['maturity_amount'] !== null ? money((float) $instrument['maturity_amount']) : '—' ?></dd>
     </dl>
     <?php if (!empty($instrument['notes'])): ?>
         <p style="margin-top:14px; margin-bottom:0;"><strong>Notes:</strong> <?= nl2br(e($instrument['notes'])) ?></p>

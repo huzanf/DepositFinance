@@ -165,6 +165,7 @@ tbody tr:hover { background: #fafbfc; }
 
 .badge-active { background: #e7f8ee; color: #1a7f37; }
 .badge-matured { background: #eef0f3; color: #656d76; }
+.badge-renewed { background: #fff4e5; color: #9a6700; }
 .badge-closed { background: #f3eef8; color: #6639a6; }
 
 .btn {
@@ -288,4 +289,65 @@ textarea { resize: vertical; min-height: 70px; }
 
 @media (max-width: 600px) {
     .detail-grid { grid-template-columns: 1fr; }
+}
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+
+.cal-weekdays {
+    margin-bottom: 8px;
+}
+
+.cal-weekday {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.cal-cell {
+    min-height: 90px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px;
+    background: #fff;
+}
+
+.cal-empty {
+    border: none;
+    background: transparent;
+}
+
+.cal-today {
+    border-color: var(--primary);
+    background: #f4f8ff;
+}
+
+.cal-daynum {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.cal-event {
+    display: block;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-decoration: none;
+}
+
+@media (max-width: 720px) {
+    .cal-cell { min-height: 60px; font-size: 12px; }
+    .cal-weekday { font-size: 10px; }
 }

@@ -18,6 +18,10 @@ $activeNav = $activeNav ?? '';
         <nav class="mainnav">
             <a href="<?= base_url('index.php') ?>" class="<?= $activeNav === 'dashboard' ? 'active' : '' ?>">Dashboard</a>
             <a href="<?= base_url('instruments.php') ?>" class="<?= $activeNav === 'instruments' ? 'active' : '' ?>">Instruments</a>
+            <a href="<?= base_url('members.php') ?>" class="<?= $activeNav === 'members' ? 'active' : '' ?>">Members</a>
+            <a href="<?= base_url('goals.php') ?>" class="<?= $activeNav === 'goals' ? 'active' : '' ?>">Goals</a>
+            <a href="<?= base_url('calendar.php') ?>" class="<?= $activeNav === 'calendar' ? 'active' : '' ?>">Calendar</a>
+            <a href="<?= base_url('reports.php') ?>" class="<?= $activeNav === 'reports' ? 'active' : '' ?>">Reports</a>
         </nav>
         <div class="topbar-right">
             <span><?= e($_SESSION['user_email']) ?></span>

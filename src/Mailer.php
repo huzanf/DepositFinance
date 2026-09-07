@@ -19,18 +19,29 @@ class Mailer
             return;
         }
 
-        self::logOtp($toEmail, $code);
+        self::appendLog('otp.log', "OTP for {$toEmail}: {$code}");
     }
 
-    private static function logOtp(string $toEmail, string $code): void
+    /** Generic send, used by the maturity reminder cron and anything else beyond OTP. */
+    public static function send(string $toEmail, string $subject, string $body): void
+    {
+        if (config('mail.driver') === 'smtp') {
+            self::sendSmtp($toEmail, $subject, $body);
+            return;
+        }
+
+        self::appendLog('mail.log', "To: {$toEmail} | Subject: {$subject}\n{$body}");
+    }
+
+    private static function appendLog(string $filename, string $message): void
     {
         $dir = __DIR__ . '/../storage';
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
 
-        $line = sprintf("[%s] OTP for %s: %s\n", date('Y-m-d H:i:s'), $toEmail, $code);
-        file_put_contents($dir . '/otp.log', $line, FILE_APPEND | LOCK_EX);
+        $line = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $message);
+        file_put_contents($dir . '/' . $filename, $line, FILE_APPEND | LOCK_EX);
     }
 
     private static function sendSmtp(string $toEmail, string $subject, string $body): void

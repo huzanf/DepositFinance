@@ -20,7 +20,9 @@ $upcoming = [];
 $hasEstimatedValues = false;
 
 foreach ($instruments as $instrument) {
-    if ($instrument['status'] === 'closed') {
+    // 'renewed' instruments have had their value carried forward into a successor
+    // instrument, and 'closed' ones are done — neither belongs in live totals.
+    if (in_array($instrument['status'], ['closed', 'renewed'], true)) {
         continue;
     }
 

@@ -4,6 +4,8 @@ require __DIR__ . '/../src/bootstrap.php';
 
 use DepositFinance\Auth;
 use DepositFinance\Instrument;
+use DepositFinance\Member;
+use DepositFinance\Goal;
 use DepositFinance\TransactionRepo;
 use DepositFinance\ValuationRepo;
 use DepositFinance\Calculations;
@@ -12,9 +14,15 @@ Auth::requireLogin();
 
 $typeFilter = $_GET['type'] ?? '';
 $statusFilter = $_GET['status'] ?? '';
+$memberFilter = isset($_GET['member']) && $_GET['member'] !== '' ? (int) $_GET['member'] : null;
+$goalFilter = isset($_GET['goal']) && $_GET['goal'] !== '' ? (int) $_GET['goal'] : null;
 
-$instruments = Instrument::all($typeFilter ?: null, $statusFilter ?: null);
+$instruments = Instrument::all($typeFilter ?: null, $statusFilter ?: null, $memberFilter, $goalFilter);
 $latestValuations = ValuationRepo::latestByInstrument();
+$members = Member::all();
+$goals = Goal::all();
+$membersById = array_column($members, null, 'id');
+$goalsById = array_column($goals, null, 'id');
 
 $pageTitle = 'Instruments';
 $activeNav = 'instruments';
@@ -39,6 +47,18 @@ require __DIR__ . '/partials/header.php';
             <option value="<?= $status ?>" <?= $statusFilter === $status ? 'selected' : '' ?>><?= ucfirst($status) ?></option>
         <?php endforeach; ?>
     </select>
+    <select name="member" onchange="this.form.submit()">
+        <option value="">All members</option>
+        <?php foreach ($members as $m): ?>
+            <option value="<?= $m['id'] ?>" <?= $memberFilter === (int) $m['id'] ? 'selected' : '' ?>><?= e($m['name']) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <select name="goal" onchange="this.form.submit()">
+        <option value="">All goals</option>
+        <?php foreach ($goals as $g): ?>
+            <option value="<?= $g['id'] ?>" <?= $goalFilter === (int) $g['id'] ? 'selected' : '' ?>><?= e($g['name']) ?></option>
+        <?php endforeach; ?>
+    </select>
 </form>
 
 <div class="card" style="padding:0">
@@ -53,6 +73,8 @@ require __DIR__ . '/partials/header.php';
             <th>Name</th>
             <th>Type</th>
             <th>Institution</th>
+            <th>Member</th>
+            <th>Goal</th>
             <th>Status</th>
             <th style="text-align:right">Net invested</th>
             <th style="text-align:right">Current value</th>
@@ -68,11 +90,15 @@ require __DIR__ . '/partials/header.php';
             $netInvested = Calculations::netInvested($transactions);
             $current = Calculations::currentValue($instrument, $transactions, $latestValuation);
             $gain = $current['value'] - $netInvested;
+            $rowMember = $instrument['member_id'] ? ($membersById[$instrument['member_id']] ?? null) : null;
+            $rowGoal = $instrument['goal_id'] ? ($goalsById[$instrument['goal_id']] ?? null) : null;
             ?>
             <tr>
                 <td><a href="<?= base_url('instrument.php?id=' . $instrument['id']) ?>"><?= e($instrument['name']) ?></a></td>
                 <td><span class="badge badge-<?= strtolower($instrument['type']) ?>"><?= $instrument['type'] ?></span></td>
                 <td><?= e($instrument['institution']) ?></td>
+                <td class="muted"><?= $rowMember ? e($rowMember['name']) : '—' ?></td>
+                <td class="muted"><?= $rowGoal ? e($rowGoal['name']) : '—' ?></td>
                 <td><span class="badge badge-<?= $instrument['status'] ?>"><?= ucfirst($instrument['status']) ?></span></td>
                 <td style="text-align:right"><?= money($netInvested) ?></td>
                 <td style="text-align:right">
