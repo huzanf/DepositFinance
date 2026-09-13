@@ -55,12 +55,40 @@ foreach ($instruments as $instrument) {
 
 usort($upcoming, fn ($a, $b) => $a['days_until'] <=> $b['days_until']);
 
+// Finish each type's row: gain and return, and drop types with nothing in them.
+foreach ($byType as $type => $totals) {
+    if ($totals['invested'] <= 0 && $totals['value'] <= 0) {
+        unset($byType[$type]);
+        continue;
+    }
+    $gain = $totals['value'] - $totals['invested'];
+    $byType[$type]['gain'] = $gain;
+    $byType[$type]['gain_pct'] = $totals['invested'] > 0 ? ($gain / $totals['invested']) * 100 : 0.0;
+}
+
 $totalGain = $totalCurrentValue - $totalInvested;
 $totalGainPct = $totalInvested > 0 ? ($totalGain / $totalInvested) * 100 : 0;
 
 $pageTitle = 'Dashboard';
 $activeNav = 'dashboard';
 require __DIR__ . '/partials/header.php';
+
+/** Renders the small FD/RD/SIP breakdown list under a dashboard tile. */
+function render_type_breakdown(array $byType, string $field, bool $isMoney, bool $signed): void
+{
+    echo '<dl class="type-breakdown">';
+    foreach ($byType as $type => $totals) {
+        $v = $totals[$field];
+        $formatted = $isMoney ? money($v) : number_format($v, 2) . '%';
+        if ($signed) {
+            $formatted = ($v >= 0 ? '+' : '') . $formatted;
+        }
+        $cls = $signed ? ($v >= 0 ? 'positive' : 'negative') : '';
+        echo '<dt><span class="badge badge-' . strtolower($type) . '">' . e($type) . '</span></dt>';
+        echo '<dd class="' . $cls . '">' . $formatted . '</dd>';
+    }
+    echo '</dl>';
+}
 ?>
 
 <div class="page-header">
@@ -79,47 +107,27 @@ require __DIR__ . '/partials/header.php';
     <div class="stat">
         <div class="label">Net invested</div>
         <div class="value"><?= money($totalInvested) ?></div>
+        <?php render_type_breakdown($byType, 'invested', true, false) ?>
     </div>
     <div class="stat">
         <div class="label">Current value</div>
         <div class="value"><?= money($totalCurrentValue) ?></div>
         <?php if ($hasEstimatedValues): ?><div class="sub">Includes estimated figures</div><?php endif; ?>
+        <?php render_type_breakdown($byType, 'value', true, false) ?>
     </div>
     <div class="stat">
         <div class="label">Overall gain</div>
         <div class="value <?= $totalGain >= 0 ? 'positive' : 'negative' ?>">
             <?= ($totalGain >= 0 ? '+' : '') . money($totalGain) ?>
         </div>
+        <?php render_type_breakdown($byType, 'gain', true, true) ?>
     </div>
     <div class="stat">
         <div class="label">Return</div>
         <div class="value <?= $totalGainPct >= 0 ? 'positive' : 'negative' ?>">
             <?= ($totalGainPct >= 0 ? '+' : '') . number_format($totalGainPct, 2) ?>%
         </div>
-    </div>
-</div>
-
-<div class="card">
-    <h2>By instrument type</h2>
-    <div class="grid grid-4">
-        <?php foreach ($byType as $type => $totals): ?>
-            <?php if ($totals['invested'] <= 0 && $totals['value'] <= 0) continue; ?>
-            <?php
-            $typeGain = $totals['value'] - $totals['invested'];
-            $typeGainPct = $totals['invested'] > 0 ? ($typeGain / $totals['invested']) * 100 : 0;
-            ?>
-            <div class="stat">
-                <div class="label"><span class="badge badge-<?= strtolower($type) ?>"><?= $type ?></span></div>
-                <dl class="type-breakdown">
-                    <dt>Net invested</dt><dd><?= money($totals['invested']) ?></dd>
-                    <dt>Current value</dt><dd><?= money($totals['value']) ?></dd>
-                    <dt>Gain</dt>
-                    <dd class="<?= $typeGain >= 0 ? 'positive' : 'negative' ?>"><?= ($typeGain >= 0 ? '+' : '') . money($typeGain) ?></dd>
-                    <dt>Return</dt>
-                    <dd class="<?= $typeGainPct >= 0 ? 'positive' : 'negative' ?>"><?= ($typeGainPct >= 0 ? '+' : '') . number_format($typeGainPct, 2) ?>%</dd>
-                </dl>
-            </div>
-        <?php endforeach; ?>
+        <?php render_type_breakdown($byType, 'gain_pct', false, true) ?>
     </div>
 </div>
 
