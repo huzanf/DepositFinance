@@ -13,8 +13,9 @@ return [
         'charset' => 'utf8mb4',
     ],
 
-    // The only email allowed to log in. OTP codes are only ever issued to this address.
-    'owner_email' => 'you@example.com',
+    // Who can log in is managed in the `users` table now, not here — see the
+    // Users page (admin only) once you're logged in, or bin/create_user.php
+    // to create the very first admin account from the command line.
 
     'mail' => [
         // 'log'  -> OTP codes are written to storage/otp.log instead of being emailed.

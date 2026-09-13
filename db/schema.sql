@@ -1,6 +1,54 @@
 -- DepositFinance schema
 -- Import this via phpMyAdmin (or `mysql depositfinance < db/schema.sql`)
 -- after creating an empty database named to match config/config.php.
+--
+-- Upgrading an existing install? Run db/migrate_multiuser.sql instead —
+-- this file is for a brand new, empty database only.
+
+-- Portal login accounts (not to be confused with `members`, which just tags
+-- who an instrument belongs to and has no login of its own). Login is email +
+-- a one-time code, so there's no password column at all.
+CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    role ENUM('admin', 'member') NOT NULL DEFAULT 'member',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    current_session_token VARCHAR(64) NULL COMMENT 'Rotated on every login; check() compares this to the session, so a newer login elsewhere ends this one',
+    last_login_at DATETIME NULL,
+    last_login_ip VARCHAR(45) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_users_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One-time login codes, scoped to a user rather than a raw email string.
+CREATE TABLE IF NOT EXISTS login_otps (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    consumed_at DATETIME NULL,
+    requested_ip VARCHAR(45) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_login_otps_user (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Login activity trail: code requests, verifications, session takeovers,
+-- idle timeouts, logouts. Viewable on login_audit.php (admin only).
+CREATE TABLE IF NOT EXISTS login_audit (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NULL,
+    email VARCHAR(190) NULL,
+    event ENUM('otp_requested', 'otp_rate_limited', 'otp_verified', 'otp_failed', 'otp_expired', 'session_replaced', 'session_timeout', 'logout') NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_login_audit_user (user_id, created_at),
+    INDEX idx_login_audit_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS members (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -76,14 +124,4 @@ CREATE TABLE IF NOT EXISTS reminders_sent (
     sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (instrument_id) REFERENCES instruments(id) ON DELETE CASCADE,
     UNIQUE KEY uniq_instrument_threshold (instrument_id, threshold_days)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS otp_codes (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(190) NOT NULL,
-    code_hash VARCHAR(255) NOT NULL,
-    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    expires_at DATETIME NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_otp_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

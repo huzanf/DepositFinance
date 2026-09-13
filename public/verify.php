@@ -8,32 +8,40 @@ if (Auth::isLoggedIn()) {
     redirect('/index.php');
 }
 
-$email = trim((string) ($_GET['email'] ?? $_POST['email'] ?? ''));
+$email = trim((string) ($_SESSION['pending_otp_email'] ?? ''));
+
+if ($email === '') {
+    redirect('/login.php');
+}
+
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
+    $action = $_POST['action'] ?? 'verify';
+
+    if ($action === 'start_over') {
+        unset($_SESSION['pending_otp_email']);
+        redirect('/login.php');
+    }
+
     $code = trim((string) ($_POST['code'] ?? ''));
+    $result = Auth::verifyOtp($email, $code);
 
-    if (!Auth::isOwnerEmail($email)) {
-        $error = 'Invalid or expired code.';
-    } else {
-        $result = Auth::verifyOtp(Auth::ownerEmail(), $code);
-
-        switch ($result) {
-            case 'ok':
-                redirect('/index.php');
-                break;
-            case 'expired':
-                $error = 'That code has expired. Request a new one.';
-                break;
-            case 'too_many_attempts':
-                $error = 'Too many incorrect attempts. Request a new code.';
-                break;
-            default:
-                $error = 'Incorrect code. Please try again.';
-        }
+    switch ($result) {
+        case 'ok':
+            unset($_SESSION['pending_otp_email']);
+            redirect('/index.php');
+            break;
+        case 'expired':
+            $error = 'That code has expired. Request a new one.';
+            break;
+        case 'too_many_attempts':
+            $error = 'Too many incorrect attempts. Request a new code.';
+            break;
+        default:
+            $error = 'Incorrect code. Please try again.';
     }
 }
 
@@ -51,7 +59,7 @@ require __DIR__ . '/partials/header.php';
         </p>
         <form method="post">
             <?= csrf_field() ?>
-            <input type="hidden" name="email" value="<?= e($email) ?>">
+            <input type="hidden" name="action" value="verify">
             <div class="form-row">
                 <label for="code">Login code</label>
                 <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}"
@@ -61,9 +69,11 @@ require __DIR__ . '/partials/header.php';
                 <button type="submit" class="btn">Verify &amp; log in</button>
             </div>
         </form>
-        <p class="muted" style="margin-top:16px; margin-bottom:0;">
-            <a href="<?= base_url('login.php') ?>">Didn't get a code? Send another</a>
-        </p>
+        <form method="post" style="margin-top:16px">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="start_over">
+            <button type="submit" class="btn btn-secondary btn-sm">Use a different email</button>
+        </form>
     </div>
 </div>
 

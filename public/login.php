@@ -18,19 +18,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Enter a valid email address.';
-    } elseif (!Auth::isOwnerEmail($email)) {
-        // Don't reveal whether the address matches the owner account.
-        flash('success', "If {$email} is authorized, a login code has been sent.");
-        redirect('/verify.php?email=' . urlencode($email));
+    } elseif (!Auth::emailExists($email)) {
+        $error = 'No DepositFinance account found for that email address.';
     } else {
-        $code = Auth::issueOtp(Auth::ownerEmail());
+        $code = Auth::issueOtp($email);
 
         if ($code === null) {
             $error = 'A code was already sent recently. Please wait a minute and try again, or check your email.';
         } else {
-            Mailer::sendOtp(Auth::ownerEmail(), $code);
+            Mailer::sendOtp($email, $code);
+            $_SESSION['pending_otp_email'] = $email;
             flash('success', "A login code has been sent to {$email}.");
-            redirect('/verify.php?email=' . urlencode($email));
+            redirect('/verify.php');
         }
     }
 }
