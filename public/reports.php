@@ -40,7 +40,7 @@ foreach ($instruments as $instrument) {
 
     $transactions = TransactionRepo::forInstrument((int) $instrument['id']);
     $latestValuation = $latestValuations[$instrument['id']] ?? null;
-    $netInvested = Calculations::netInvested($transactions);
+    $netInvested = Calculations::netInvested($instrument, $transactions);
     $current = Calculations::currentValue($instrument, $transactions, $latestValuation);
     $expectedMaturity = $instrument['maturity_amount'] !== null ? (float) $instrument['maturity_amount'] : $current['value'];
 

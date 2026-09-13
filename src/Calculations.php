@@ -5,25 +5,144 @@ namespace DepositFinance;
 /**
  * All the money math: net invested, current value estimates, and XIRR.
  *
- * Convention used throughout: every transaction 'amount' is stored as a positive
- * number. txn_type says which direction it moves money:
- *   - contribution        money you put IN
- *   - withdrawal          money you took OUT
- *   - maturity_payout     money you received when the instrument matured/closed
- *   - interest_credit     interest paid out to you (not reinvested)
+ * Contributions are no longer something you log by hand — an FD's principal
+ * and an RD/SIP's recurring installments are assumed to have gone out of your
+ * account on schedule (start_date + frequency), exactly like a real bank does.
+ * The transaction log is now only for exceptions: a withdrawal, a missed
+ * installment (logged as a withdrawal to net it back out), an extra top-up
+ * beyond the regular schedule (contribution), or money actually received
+ * (maturity_payout, interest_credit).
  */
 class Calculations
 {
     private const OUTFLOW_TYPES = ['contribution'];
     private const INFLOW_TYPES = ['withdrawal', 'maturity_payout', 'interest_credit'];
 
-    public static function netInvested(array $transactions): float
+    /**
+     * Adds $months calendar months to $date, clamping the day to the target
+     * month's last valid day (so 31 Jan + 1 month lands on 28/29 Feb, not 3 Mar).
+     */
+    public static function addMonthsClamped(string $date, int $months): string
     {
-        $net = 0.0;
-        foreach ($transactions as $txn) {
-            $sign = in_array($txn['txn_type'], self::OUTFLOW_TYPES, true) ? 1 : -1;
-            $net += $sign * (float) $txn['amount'];
+        $start = new \DateTimeImmutable($date);
+        $day = (int) $start->format('d');
+
+        $target = $start->modify('first day of this month')->modify("+{$months} months");
+        $lastDayOfTargetMonth = (int) $target->format('t');
+        $finalDay = min($day, $lastDayOfTargetMonth);
+
+        return $target->modify('+' . ($finalDay - 1) . ' days')->format('Y-m-d');
+    }
+
+    private static function periodMonths(string $frequency): int
+    {
+        return match ($frequency) {
+            'quarterly' => 3,
+            'yearly' => 12,
+            default => 1,
+        };
+    }
+
+    /**
+     * How many installments (or, for a one-time FD, the single principal
+     * deposit) should have occurred by today — capped at the instrument's
+     * maturity date once it's matured, so the count stops growing after that.
+     */
+    public static function scheduledInstallmentCount(array $instrument): int
+    {
+        $today = date('Y-m-d');
+        $capDate = $instrument['maturity_date'] ?? null;
+        $start = new \DateTimeImmutable($instrument['start_date']);
+
+        if ($capDate && $capDate <= $today) {
+            // The maturity date itself closes the schedule rather than being one
+            // more installment date, so count up to the day before it.
+            $asOf = (new \DateTimeImmutable($capDate))->modify('-1 day');
+        } else {
+            $asOf = new \DateTimeImmutable($today);
         }
+
+        if ($asOf < $start) {
+            return 0;
+        }
+
+        if ($instrument['frequency'] === 'one-time') {
+            return 1;
+        }
+
+        $elapsedMonths = ((int) $asOf->format('Y') - (int) $start->format('Y')) * 12
+            + ((int) $asOf->format('n') - (int) $start->format('n'));
+        if ((int) $asOf->format('j') >= (int) $start->format('j')) {
+            $elapsedMonths++;
+        }
+
+        if ($elapsedMonths < 1) {
+            return 0;
+        }
+
+        $period = self::periodMonths($instrument['frequency']);
+        return intdiv($elapsedMonths - 1, $period) + 1;
+    }
+
+    /** Total scheduled principal to date: the FD lump sum, or installments x count for RD/SIP. */
+    public static function scheduledNetInvested(array $instrument): float
+    {
+        $count = self::scheduledInstallmentCount($instrument);
+
+        if ($instrument['frequency'] === 'one-time') {
+            return $count > 0 ? (float) ($instrument['principal_amount'] ?? 0) : 0.0;
+        }
+
+        return $count * (float) ($instrument['installment_amount'] ?? 0);
+    }
+
+    /** One synthetic outflow per scheduled installment, dated to when each was due. */
+    public static function buildScheduledCashflows(array $instrument): array
+    {
+        $count = self::scheduledInstallmentCount($instrument);
+        if ($count === 0) {
+            return [];
+        }
+
+        if ($instrument['frequency'] === 'one-time') {
+            return [[
+                'date' => $instrument['start_date'],
+                'amount' => -(float) ($instrument['principal_amount'] ?? 0),
+            ]];
+        }
+
+        $amount = (float) ($instrument['installment_amount'] ?? 0);
+        $period = self::periodMonths($instrument['frequency']);
+
+        $flows = [];
+        for ($i = 0; $i < $count; $i++) {
+            $flows[] = [
+                'date' => self::addMonthsClamped($instrument['start_date'], $i * $period),
+                'amount' => -$amount,
+            ];
+        }
+
+        return $flows;
+    }
+
+    /**
+     * Net invested = the auto-calculated schedule, adjusted by any manually
+     * logged exceptions (a withdrawal reduces it, an extra contribution adds
+     * to it). Maturity payouts and interest credits are money received, not
+     * principal, so they don't affect this figure.
+     */
+    public static function netInvested(array $instrument, array $transactions): float
+    {
+        $net = self::scheduledNetInvested($instrument);
+
+        foreach ($transactions as $txn) {
+            if ($txn['txn_type'] === 'contribution') {
+                $net += (float) $txn['amount'];
+            } elseif ($txn['txn_type'] === 'withdrawal') {
+                $net -= (float) $txn['amount'];
+            }
+        }
+
         return $net;
     }
 
@@ -44,7 +163,7 @@ class Calculations
             ];
         }
 
-        $netInvested = self::netInvested($transactions);
+        $netInvested = self::netInvested($instrument, $transactions);
         $rate = $instrument['interest_rate'] !== null ? (float) $instrument['interest_rate'] : null;
 
         if ($netInvested <= 0 || $rate === null) {
@@ -69,12 +188,13 @@ class Calculations
     }
 
     /**
-     * Builds an XIRR cashflow series from an instrument's transactions plus its
-     * current value as a final, present-day inflow.
+     * Builds an XIRR cashflow series from the instrument's scheduled installments,
+     * any logged exception transactions, and its current value as a final,
+     * present-day inflow.
      */
-    public static function buildCashflows(array $transactions, float $currentValue): array
+    public static function buildCashflows(array $instrument, array $transactions, float $currentValue): array
     {
-        $flows = [];
+        $flows = self::buildScheduledCashflows($instrument);
 
         foreach ($transactions as $txn) {
             $sign = in_array($txn['txn_type'], self::OUTFLOW_TYPES, true) ? -1 : 1;

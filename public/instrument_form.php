@@ -6,6 +6,7 @@ use DepositFinance\Auth;
 use DepositFinance\Instrument;
 use DepositFinance\Member;
 use DepositFinance\Goal;
+use DepositFinance\Calculations;
 
 Auth::requireLogin();
 
@@ -100,6 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'renewed_from_id' => $_POST['renewed_from_id'] !== '' ? (int) $_POST['renewed_from_id'] : null,
         'notes' => trim((string) ($_POST['notes'] ?? '')),
     ];
+
+    // Maturity date is auto-calculated from start date + tenure when left blank —
+    // still overridable by typing an explicit date, e.g. if the bank's actual
+    // certificate lands a day or two off due to processing.
+    if ($form['maturity_date'] === '' && $tenureTotalMonths > 0 && strtotime($form['start_date'])) {
+        $form['maturity_date'] = Calculations::addMonthsClamped($form['start_date'], $tenureTotalMonths);
+    }
 
     if (!in_array($form['type'], Instrument::TYPES, true)) {
         $errors[] = 'Choose a valid instrument type.';
@@ -279,7 +287,7 @@ require __DIR__ . '/partials/header.php';
             <div class="form-row">
                 <label for="maturity_date">Maturity date</label>
                 <input type="date" id="maturity_date" name="maturity_date" value="<?= e($form['maturity_date'] ?? '') ?>">
-                <div class="hint">Leave blank for an open-ended SIP.</div>
+                <div class="hint">Leave blank to auto-calculate from start date + tenure (or for an open-ended SIP).</div>
             </div>
         </div>
 

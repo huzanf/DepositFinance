@@ -30,10 +30,10 @@ fputcsv($out, [
 foreach ($instruments as $instrument) {
     $transactions = TransactionRepo::forInstrument((int) $instrument['id']);
     $latestValuation = $latestValuations[$instrument['id']] ?? null;
-    $netInvested = Calculations::netInvested($transactions);
+    $netInvested = Calculations::netInvested($instrument, $transactions);
     $current = Calculations::currentValue($instrument, $transactions, $latestValuation);
     $gain = $current['value'] - $netInvested;
-    $cashflows = Calculations::buildCashflows($transactions, $current['value']);
+    $cashflows = Calculations::buildCashflows($instrument, $transactions, $current['value']);
     $xirr = Calculations::xirr($cashflows);
 
     fputcsv($out, [

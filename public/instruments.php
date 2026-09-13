@@ -87,7 +87,7 @@ require __DIR__ . '/partials/header.php';
             <?php
             $transactions = TransactionRepo::forInstrument((int) $instrument['id']);
             $latestValuation = $latestValuations[$instrument['id']] ?? null;
-            $netInvested = Calculations::netInvested($transactions);
+            $netInvested = Calculations::netInvested($instrument, $transactions);
             $current = Calculations::currentValue($instrument, $transactions, $latestValuation);
             $gain = $current['value'] - $netInvested;
             $rowMember = $instrument['member_id'] ? ($membersById[$instrument['member_id']] ?? null) : null;

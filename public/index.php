@@ -15,7 +15,11 @@ $latestValuations = ValuationRepo::latestByInstrument();
 
 $totalInvested = 0.0;
 $totalCurrentValue = 0.0;
-$byType = ['FD' => 0.0, 'RD' => 0.0, 'SIP' => 0.0];
+$byType = [
+    'FD' => ['invested' => 0.0, 'value' => 0.0],
+    'RD' => ['invested' => 0.0, 'value' => 0.0],
+    'SIP' => ['invested' => 0.0, 'value' => 0.0],
+];
 $upcoming = [];
 $hasEstimatedValues = false;
 
@@ -29,12 +33,13 @@ foreach ($instruments as $instrument) {
     $transactions = TransactionRepo::forInstrument((int) $instrument['id']);
     $latestValuation = $latestValuations[$instrument['id']] ?? null;
 
-    $netInvested = Calculations::netInvested($transactions);
+    $netInvested = Calculations::netInvested($instrument, $transactions);
     $current = Calculations::currentValue($instrument, $transactions, $latestValuation);
 
     $totalInvested += $netInvested;
     $totalCurrentValue += $current['value'];
-    $byType[$instrument['type']] += $current['value'];
+    $byType[$instrument['type']]['invested'] += $netInvested;
+    $byType[$instrument['type']]['value'] += $current['value'];
 
     if ($current['is_estimated']) {
         $hasEstimatedValues = true;
@@ -94,46 +99,49 @@ require __DIR__ . '/partials/header.php';
     </div>
 </div>
 
-<div class="grid grid-2">
-    <div class="card">
-        <h2>By instrument type</h2>
+<div class="card">
+    <h2>By instrument type</h2>
+    <div class="grid grid-4">
+        <?php foreach ($byType as $type => $totals): ?>
+            <?php if ($totals['invested'] <= 0 && $totals['value'] <= 0) continue; ?>
+            <?php
+            $typeGain = $totals['value'] - $totals['invested'];
+            $typeGainPct = $totals['invested'] > 0 ? ($typeGain / $totals['invested']) * 100 : 0;
+            ?>
+            <div class="stat">
+                <div class="label"><span class="badge badge-<?= strtolower($type) ?>"><?= $type ?></span></div>
+                <dl class="type-breakdown">
+                    <dt>Net invested</dt><dd><?= money($totals['invested']) ?></dd>
+                    <dt>Current value</dt><dd><?= money($totals['value']) ?></dd>
+                    <dt>Gain</dt>
+                    <dd class="<?= $typeGain >= 0 ? 'positive' : 'negative' ?>"><?= ($typeGain >= 0 ? '+' : '') . money($typeGain) ?></dd>
+                    <dt>Return</dt>
+                    <dd class="<?= $typeGainPct >= 0 ? 'positive' : 'negative' ?>"><?= ($typeGainPct >= 0 ? '+' : '') . number_format($typeGainPct, 2) ?>%</dd>
+                </dl>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Upcoming maturities / due dates <span class="muted" style="font-weight:normal">(next 60 days)</span></h2>
+    <?php if (empty($upcoming)): ?>
+        <p class="muted">Nothing coming up.</p>
+    <?php else: ?>
         <table>
             <tbody>
-            <?php foreach ($byType as $type => $value): ?>
-                <?php if ($value > 0): ?>
+            <?php foreach ($upcoming as $u): ?>
                 <tr>
-                    <td><span class="badge badge-<?= strtolower($type) ?>"><?= $type ?></span></td>
-                    <td style="text-align:right"><?= money($value) ?></td>
-                    <td style="text-align:right" class="muted">
-                        <?= $totalCurrentValue > 0 ? number_format($value / $totalCurrentValue * 100, 1) : '0.0' ?>%
+                    <td><a href="<?= base_url('instrument.php?id=' . $u['id']) ?>"><?= e($u['name']) ?></a></td>
+                    <td class="muted"><?= e(date('d M Y', strtotime($u['maturity_date']))) ?></td>
+                    <td style="text-align:right">
+                        <?= $u['days_until'] === 0 ? 'Today' : 'in ' . $u['days_until'] . ' days' ?>
                     </td>
                 </tr>
-                <?php endif; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
-
-    <div class="card">
-        <h2>Upcoming maturities / due dates <span class="muted" style="font-weight:normal">(next 60 days)</span></h2>
-        <?php if (empty($upcoming)): ?>
-            <p class="muted">Nothing coming up.</p>
-        <?php else: ?>
-            <table>
-                <tbody>
-                <?php foreach ($upcoming as $u): ?>
-                    <tr>
-                        <td><a href="<?= base_url('instrument.php?id=' . $u['id']) ?>"><?= e($u['name']) ?></a></td>
-                        <td class="muted"><?= e(date('d M Y', strtotime($u['maturity_date']))) ?></td>
-                        <td style="text-align:right">
-                            <?= $u['days_until'] === 0 ? 'Today' : 'in ' . $u['days_until'] . ' days' ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
+    <?php endif; ?>
 </div>
 
 <?php endif; ?>

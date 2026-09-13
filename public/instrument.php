@@ -82,13 +82,15 @@ $transactions = TransactionRepo::forInstrument($id);
 $valuations = ValuationRepo::forInstrument($id);
 $latestValuation = $valuations[0] ?? null;
 
-$netInvested = Calculations::netInvested($transactions);
+$netInvested = Calculations::netInvested($instrument, $transactions);
 $current = Calculations::currentValue($instrument, $transactions, $latestValuation);
 $gain = $current['value'] - $netInvested;
 $gainPct = $netInvested > 0 ? ($gain / $netInvested) * 100 : 0;
 
-$cashflows = Calculations::buildCashflows($transactions, $current['value']);
+$cashflows = Calculations::buildCashflows($instrument, $transactions, $current['value']);
 $xirr = Calculations::xirr($cashflows);
+
+$scheduledCount = Calculations::scheduledInstallmentCount($instrument);
 
 $member = $instrument['member_id'] ? Member::find((int) $instrument['member_id']) : null;
 $goal = $instrument['goal_id'] ? Goal::find((int) $instrument['goal_id']) : null;
@@ -137,6 +139,11 @@ require __DIR__ . '/partials/header.php';
     <div class="stat">
         <div class="label">Net invested</div>
         <div class="value"><?= money($netInvested) ?></div>
+        <div class="sub">
+            <?= $instrument['frequency'] === 'one-time'
+                ? ($scheduledCount > 0 ? 'Principal deposited on start date' : 'Not yet started')
+                : $scheduledCount . ' installment' . ($scheduledCount === 1 ? '' : 's') . ' to date' ?>
+        </div>
     </div>
     <div class="stat">
         <div class="label">Current value</div>
@@ -182,6 +189,12 @@ require __DIR__ . '/partials/header.php';
 <div class="grid grid-2">
     <div class="card">
         <h2>Transactions</h2>
+        <p class="muted" style="margin-top:0">
+            Regular installments (and the FD principal) are counted automatically from the schedule above —
+            you don't need to log those. Use this only for exceptions: a withdrawal, a missed installment
+            (log it as a withdrawal to net it back out), an extra top-up beyond the regular schedule, or
+            money actually received (a maturity payout or interest paid out in cash).
+        </p>
         <form method="post" style="margin-bottom:18px">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="add_transaction">
@@ -193,8 +206,8 @@ require __DIR__ . '/partials/header.php';
                 <div class="form-row">
                     <label for="txn_type">Type<?= req() ?></label>
                     <select id="txn_type" name="txn_type" required>
-                        <option value="contribution">Contribution (money in)</option>
                         <option value="withdrawal">Withdrawal</option>
+                        <option value="contribution">Extra contribution (beyond the regular schedule)</option>
                         <option value="maturity_payout">Maturity payout</option>
                         <option value="interest_credit">Interest credit</option>
                     </select>
@@ -203,8 +216,7 @@ require __DIR__ . '/partials/header.php';
             <div class="grid grid-2">
                 <div class="form-row">
                     <label for="amount">Amount<?= req() ?></label>
-                    <input type="number" step="0.01" min="0.01" id="amount" name="amount" required
-                           value="<?= $instrument['installment_amount'] !== null ? e($instrument['installment_amount']) : '' ?>">
+                    <input type="number" step="0.01" min="0.01" id="amount" name="amount" required>
                 </div>
                 <div class="form-row">
                     <label for="txn_notes">Notes</label>

@@ -125,6 +125,24 @@ h2 { font-size: 18px; margin: 0 0 12px; }
     margin-top: 4px;
 }
 
+.type-breakdown {
+    margin: 8px 0 0;
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 3px 10px;
+    font-size: 13px;
+}
+
+.type-breakdown dt {
+    color: var(--text-muted);
+}
+
+.type-breakdown dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 600;
+}
+
 .positive { color: var(--green); }
 .negative { color: var(--red); }
 .muted { color: var(--text-muted); }
