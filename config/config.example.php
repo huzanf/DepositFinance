@@ -18,9 +18,12 @@ return [
     // to create the very first admin account from the command line.
 
     'mail' => [
-        // 'log'  -> OTP codes are written to storage/otp.log instead of being emailed.
-        //           Use this while developing locally, before SMTP is configured.
-        // 'smtp' -> OTP codes are sent by email over SMTP using the settings below.
+        // 'log'      -> OTP codes are written to storage/otp.log instead of being emailed.
+        //               Use this while developing locally, before mail is configured.
+        // 'smtp'     -> OTP codes are sent by email over SMTP using the settings below.
+        // 'php_mail' -> sent via PHP's built-in mail() instead — try this if 'smtp' can't
+        //               get through (some shared hosts block outbound SMTP ports entirely).
+        //               Only from_email/from_name below are used for this driver.
         'driver' => 'log',
 
         'smtp_host' => '',
