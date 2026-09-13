@@ -170,6 +170,7 @@ $tenureTotalForDisplay = (int) ($form['tenure_months'] ?? 0);
 $selectedTenureYears = intdiv($tenureTotalForDisplay, 12);
 $selectedTenureMonthsPart = $tenureTotalForDisplay % 12;
 
+$theme = current_theme();
 $pageTitle = $instrument ? 'Edit instrument' : ($renewFrom ? 'Renew instrument' : 'Add investment');
 $activeNav = 'instruments';
 require __DIR__ . '/partials/header.php';
@@ -189,12 +190,23 @@ require __DIR__ . '/partials/header.php';
     </div>
 <?php endif; ?>
 
+<?php if ($theme !== 'zero'): ?>
+<div class="steps" id="wizard-steps">
+    <div class="step active" data-step-indicator="1"><span class="step-num">1</span><span class="step-label">Basic info</span></div>
+    <div class="step-connector"></div>
+    <div class="step" data-step-indicator="2"><span class="step-num">2</span><span class="step-label">Value &amp; returns</span></div>
+    <div class="step-connector"></div>
+    <div class="step" data-step-indicator="3"><span class="step-num">3</span><span class="step-label">Review</span></div>
+</div>
+<?php endif; ?>
+
 <div class="card">
     <p class="form-legend"><span class="req">*</span> Required</p>
-    <form method="post">
+    <form method="post" id="instrument-form">
         <?= csrf_field() ?>
         <input type="hidden" name="renewed_from_id" value="<?= e((string) ($form['renewed_from_id'] ?? '')) ?>">
 
+        <div class="wizard-panel active" data-step="1">
         <div class="grid grid-2">
             <div class="form-row">
                 <label for="type">Type<?= req() ?></label>
@@ -278,7 +290,14 @@ require __DIR__ . '/partials/header.php';
                 <div class="hint">Optional.</div>
             </div>
         </div>
+        <?php if ($theme !== 'zero'): ?>
+        <div class="form-actions">
+            <button type="button" class="btn wizard-next" data-goto="2">Next: Value &amp; returns</button>
+        </div>
+        <?php endif; ?>
+        </div><?php // .wizard-panel[1] ?>
 
+        <div class="wizard-panel" data-step="2">
         <div class="grid grid-2">
             <div class="form-row">
                 <label for="start_date">Start date<?= req() ?></label>
@@ -337,17 +356,84 @@ require __DIR__ . '/partials/header.php';
                        placeholder="Optional — what the bank says you'll receive" value="<?= e($form['maturity_amount'] ?? '') ?>">
             </div>
         </div>
+        <?php if ($theme !== 'zero'): ?>
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary wizard-prev" data-goto="1">Back</button>
+            <button type="button" class="btn wizard-next" data-goto="3">Next: Review</button>
+        </div>
+        <?php endif; ?>
+        </div><?php // .wizard-panel[2] ?>
 
+        <div class="wizard-panel" data-step="3">
         <div class="form-row">
             <label for="notes">Notes</label>
             <textarea id="notes" name="notes" placeholder="Nominee, anything worth remembering"><?= e($form['notes'] ?? '') ?></textarea>
         </div>
 
         <div class="form-actions">
+            <?php if ($theme !== 'zero'): ?>
+                <button type="button" class="btn btn-secondary wizard-prev" data-goto="2">Back</button>
+            <?php endif; ?>
             <button type="submit" class="btn"><?= $instrument ? 'Save changes' : ($renewFrom ? 'Create renewed instrument' : 'Add investment') ?></button>
             <a href="<?= $instrument ? base_url('instrument.php?id=' . $id) : base_url('instruments.php') ?>" class="btn btn-secondary">Cancel</a>
         </div>
+        </div><?php // .wizard-panel[3] ?>
     </form>
 </div>
+
+<?php if ($theme !== 'zero'): ?>
+<script>
+(function () {
+    var panels = Array.prototype.slice.call(document.querySelectorAll('.wizard-panel'));
+    var stepPills = Array.prototype.slice.call(document.querySelectorAll('#wizard-steps .step'));
+
+    function goTo(step) {
+        panels.forEach(function (p) {
+            p.classList.toggle('active', p.getAttribute('data-step') === String(step));
+        });
+        stepPills.forEach(function (s) {
+            var n = s.getAttribute('data-step-indicator');
+            s.classList.remove('active', 'done');
+            if (n === String(step)) {
+                s.classList.add('active');
+            } else if (parseInt(n, 10) < step) {
+                s.classList.add('done');
+            }
+        });
+        var panel = document.querySelector('.wizard-panel[data-step="' + step + '"]');
+        if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function validatePanel(panel) {
+        var inputs = panel.querySelectorAll('input, select, textarea');
+        for (var i = 0; i < inputs.length; i++) {
+            if (!inputs[i].checkValidity()) {
+                inputs[i].reportValidity();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    document.querySelectorAll('.wizard-next').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var current = btn.closest('.wizard-panel');
+            if (current && !validatePanel(current)) {
+                return;
+            }
+            goTo(btn.getAttribute('data-goto'));
+        });
+    });
+
+    document.querySelectorAll('.wizard-prev').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            goTo(btn.getAttribute('data-goto'));
+        });
+    });
+})();
+</script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/partials/footer.php'; ?>

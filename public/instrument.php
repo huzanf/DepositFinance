@@ -97,6 +97,19 @@ $goal = $instrument['goal_id'] ? Goal::find((int) $instrument['goal_id']) : null
 $renewedFrom = $instrument['renewed_from_id'] ? Instrument::find((int) $instrument['renewed_from_id']) : null;
 $renewedTo = Instrument::findSuccessorOf($id);
 
+$tenurePct = null;
+$tenureElapsedLabel = null;
+if ($instrument['maturity_date'] && $instrument['tenure_months']) {
+    $startTs = strtotime($instrument['start_date']);
+    $maturityTs = strtotime($instrument['maturity_date']);
+    $totalDays = max(1, ($maturityTs - $startTs) / 86400);
+    $elapsedDays = min($totalDays, max(0, (strtotime('today') - $startTs) / 86400));
+    $tenurePct = min(100, round($elapsedDays / $totalDays * 100));
+    $elapsedMonths = (int) round($elapsedDays / 30.44);
+    $tenureElapsedLabel = format_tenure($elapsedMonths) . ' completed';
+}
+
+$theme = current_theme();
 $pageTitle = $instrument['name'];
 $activeNav = 'instruments';
 require __DIR__ . '/partials/header.php';
@@ -165,6 +178,16 @@ require __DIR__ . '/partials/header.php';
         <div class="sub">Annualized</div>
     </div>
 </div>
+
+<?php if ($theme !== 'zero' && $tenurePct !== null): ?>
+<div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <strong><?= e($tenureElapsedLabel) ?></strong>
+        <span class="muted"><?= $tenurePct ?>%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" style="width:<?= $tenurePct ?>%"></div></div>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <h2>Details</h2>

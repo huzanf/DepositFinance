@@ -39,4 +39,10 @@ return [
         'timezone' => 'Asia/Kolkata',
         'session_name' => 'depositfinance_session',
     ],
+
+    'ui' => [
+        // 'one'  -> the redesigned look (sidebar navigation, dashboard chart, OTP entry boxes, etc).
+        // 'zero' -> the original plain layout, kept as a fallback / for anyone who prefers it.
+        'theme' => 'one',
+    ],
 ];
