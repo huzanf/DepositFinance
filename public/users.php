@@ -55,11 +55,11 @@ require __DIR__ . '/partials/header.php';
         <input type="hidden" name="action" value="save">
         <div class="grid grid-2">
             <div class="form-row">
-                <label for="name">Full name</label>
+                <label for="name">Full name<?= req() ?></label>
                 <input type="text" id="name" name="name" required>
             </div>
             <div class="form-row">
-                <label for="email">Email</label>
+                <label for="email">Email<?= req() ?></label>
                 <input type="email" id="email" name="email" required>
             </div>
         </div>

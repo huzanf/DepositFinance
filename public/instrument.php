@@ -165,7 +165,7 @@ require __DIR__ . '/partials/header.php';
         <dt>Account / RD / folio number</dt><dd><?= !empty($instrument['account_number']) ? e($instrument['account_number']) : '—' ?></dd>
         <dt>Member</dt><dd><?= $member ? e($member['name']) : '—' ?></dd>
         <dt>Goal</dt><dd><?= $goal ? e($goal['name']) : '—' ?></dd>
-        <dt>Tenure</dt><dd><?= $instrument['tenure_months'] !== null ? e($instrument['tenure_months']) . ' months' : '—' ?></dd>
+        <dt>Tenure</dt><dd><?= e(format_tenure($instrument['tenure_months'] !== null ? (int) $instrument['tenure_months'] : null)) ?></dd>
         <dt>Start date</dt><dd><?= e(date('d M Y', strtotime($instrument['start_date']))) ?></dd>
         <dt>Maturity date</dt><dd><?= $instrument['maturity_date'] ? e(date('d M Y', strtotime($instrument['maturity_date']))) : '—' ?></dd>
         <dt>Interest rate / expected return</dt><dd><?= $instrument['interest_rate'] !== null ? e($instrument['interest_rate']) . '% p.a.' : '—' ?></dd>
@@ -187,11 +187,11 @@ require __DIR__ . '/partials/header.php';
             <input type="hidden" name="action" value="add_transaction">
             <div class="grid grid-2">
                 <div class="form-row">
-                    <label for="txn_date">Date</label>
+                    <label for="txn_date">Date<?= req() ?></label>
                     <input type="date" id="txn_date" name="txn_date" required value="<?= e(date('Y-m-d')) ?>">
                 </div>
                 <div class="form-row">
-                    <label for="txn_type">Type</label>
+                    <label for="txn_type">Type<?= req() ?></label>
                     <select id="txn_type" name="txn_type" required>
                         <option value="contribution">Contribution (money in)</option>
                         <option value="withdrawal">Withdrawal</option>
@@ -202,7 +202,7 @@ require __DIR__ . '/partials/header.php';
             </div>
             <div class="grid grid-2">
                 <div class="form-row">
-                    <label for="amount">Amount</label>
+                    <label for="amount">Amount<?= req() ?></label>
                     <input type="number" step="0.01" min="0.01" id="amount" name="amount" required
                            value="<?= $instrument['installment_amount'] !== null ? e($instrument['installment_amount']) : '' ?>">
                 </div>
@@ -248,11 +248,11 @@ require __DIR__ . '/partials/header.php';
             <input type="hidden" name="action" value="add_valuation">
             <div class="grid grid-2">
                 <div class="form-row">
-                    <label for="value_date">As of date</label>
+                    <label for="value_date">As of date<?= req() ?></label>
                     <input type="date" id="value_date" name="value_date" required value="<?= e(date('Y-m-d')) ?>">
                 </div>
                 <div class="form-row">
-                    <label for="current_value">Current value</label>
+                    <label for="current_value">Current value<?= req() ?></label>
                     <input type="number" step="0.01" min="0" id="current_value" name="current_value" required>
                 </div>
             </div>

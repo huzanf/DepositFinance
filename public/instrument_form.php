@@ -76,6 +76,10 @@ if ($instrument) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
+    $tenureYears = max(0, min(30, (int) ($_POST['tenure_years'] ?? 0)));
+    $tenureMonthsPart = max(0, min(11, (int) ($_POST['tenure_months_part'] ?? 0)));
+    $tenureTotalMonths = $tenureYears * 12 + $tenureMonthsPart;
+
     $form = [
         'type' => $_POST['type'] ?? '',
         'name' => trim((string) ($_POST['name'] ?? '')),
@@ -90,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'principal_amount' => trim((string) ($_POST['principal_amount'] ?? '')),
         'installment_amount' => trim((string) ($_POST['installment_amount'] ?? '')),
         'frequency' => $_POST['frequency'] ?? 'monthly',
-        'tenure_months' => trim((string) ($_POST['tenure_months'] ?? '')),
+        'tenure_months' => $tenureTotalMonths > 0 ? (string) $tenureTotalMonths : '',
         'maturity_amount' => trim((string) ($_POST['maturity_amount'] ?? '')),
         'status' => $_POST['status'] ?? 'active',
         'renewed_from_id' => $_POST['renewed_from_id'] !== '' ? (int) $_POST['renewed_from_id'] : null,
@@ -120,9 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($form['installment_amount'] !== '' && !is_numeric($form['installment_amount'])) {
         $errors[] = 'Installment amount must be a number.';
-    }
-    if ($form['tenure_months'] !== '' && !ctype_digit($form['tenure_months'])) {
-        $errors[] = 'Tenure must be a whole number of months.';
     }
     if ($form['maturity_amount'] !== '' && !is_numeric($form['maturity_amount'])) {
         $errors[] = 'Maturity amount must be a number.';
@@ -155,6 +156,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $members = Member::all();
 $goals = Goal::all();
+$institutions = Instrument::distinctInstitutions();
+
+$tenureTotalForDisplay = (int) ($form['tenure_months'] ?? 0);
+$selectedTenureYears = intdiv($tenureTotalForDisplay, 12);
+$selectedTenureMonthsPart = $tenureTotalForDisplay % 12;
 
 $pageTitle = $instrument ? 'Edit instrument' : ($renewFrom ? 'Renew instrument' : 'Add investment');
 $activeNav = 'instruments';
@@ -176,13 +182,14 @@ require __DIR__ . '/partials/header.php';
 <?php endif; ?>
 
 <div class="card">
+    <p class="form-legend"><span class="req">*</span> Required</p>
     <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="renewed_from_id" value="<?= e((string) ($form['renewed_from_id'] ?? '')) ?>">
 
         <div class="grid grid-2">
             <div class="form-row">
-                <label for="type">Type</label>
+                <label for="type">Type<?= req() ?></label>
                 <select id="type" name="type" required>
                     <?php foreach (Instrument::TYPES as $type): ?>
                         <option value="<?= $type ?>" <?= $form['type'] === $type ? 'selected' : '' ?>><?= $type ?></option>
@@ -190,7 +197,7 @@ require __DIR__ . '/partials/header.php';
                 </select>
             </div>
             <div class="form-row">
-                <label for="status">Status</label>
+                <label for="status">Status<?= req() ?></label>
                 <select id="status" name="status" required>
                     <?php foreach (Instrument::STATUSES as $status): ?>
                         <option value="<?= $status ?>" <?= $form['status'] === $status ? 'selected' : '' ?>><?= ucfirst($status) ?></option>
@@ -201,14 +208,19 @@ require __DIR__ . '/partials/header.php';
 
         <div class="grid grid-2">
             <div class="form-row">
-                <label for="name">Name</label>
+                <label for="name">Name<?= req() ?></label>
                 <input type="text" id="name" name="name" required placeholder="e.g. HDFC 3-year FD"
                        value="<?= e($form['name']) ?>">
             </div>
             <div class="form-row">
-                <label for="institution">Institution</label>
+                <label for="institution">Institution<?= req() ?></label>
                 <input type="text" id="institution" name="institution" required placeholder="e.g. HDFC Bank"
-                       value="<?= e($form['institution']) ?>">
+                       list="institution-list" value="<?= e($form['institution']) ?>">
+                <datalist id="institution-list">
+                    <?php foreach ($institutions as $inst): ?>
+                        <option value="<?= e($inst) ?>">
+                    <?php endforeach; ?>
+                </datalist>
             </div>
         </div>
 
@@ -242,15 +254,26 @@ require __DIR__ . '/partials/header.php';
                 <?php if (empty($goals)): ?><div class="hint">No goals yet — <a href="<?= base_url('goal_form.php') ?>">add one</a>.</div><?php endif; ?>
             </div>
             <div class="form-row">
-                <label for="tenure_months">Tenure (months)</label>
-                <input type="number" step="1" min="0" id="tenure_months" name="tenure_months" placeholder="Optional"
-                       value="<?= e($form['tenure_months'] ?? '') ?>">
+                <label for="tenure_years">Tenure</label>
+                <div class="tenure-fields">
+                    <select id="tenure_years" name="tenure_years">
+                        <?php for ($y = 0; $y <= 30; $y++): ?>
+                            <option value="<?= $y ?>" <?= $selectedTenureYears === $y ? 'selected' : '' ?>><?= $y ?> yr<?= $y === 1 ? '' : 's' ?></option>
+                        <?php endfor; ?>
+                    </select>
+                    <select id="tenure_months_part" name="tenure_months_part">
+                        <?php for ($m = 0; $m <= 11; $m++): ?>
+                            <option value="<?= $m ?>" <?= $selectedTenureMonthsPart === $m ? 'selected' : '' ?>><?= $m ?> mo<?= $m === 1 ? '' : 's' ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="hint">Optional.</div>
             </div>
         </div>
 
         <div class="grid grid-2">
             <div class="form-row">
-                <label for="start_date">Start date</label>
+                <label for="start_date">Start date<?= req() ?></label>
                 <input type="date" id="start_date" name="start_date" required value="<?= e($form['start_date']) ?>">
             </div>
             <div class="form-row">

@@ -219,6 +219,25 @@ form.inline { display: inline; }
     margin-top: 4px;
 }
 
+.req {
+    color: var(--red);
+}
+
+.form-legend {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: -8px 0 18px;
+}
+
+.tenure-fields {
+    display: flex;
+    gap: 10px;
+}
+
+.tenure-fields select {
+    flex: 1;
+}
+
 input[type=text], input[type=email], input[type=number], input[type=date],
 input[type=password], select, textarea {
     width: 100%;

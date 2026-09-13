@@ -91,3 +91,29 @@ function base_url(string $path = ''): string
 {
     return '/' . ltrim($path, '/');
 }
+
+/** Red asterisk marker for a required form field's label. */
+function req(): string
+{
+    return ' <span class="req">*</span>';
+}
+
+function format_tenure(?int $months): string
+{
+    if ($months === null || $months <= 0) {
+        return '—';
+    }
+
+    $years = intdiv($months, 12);
+    $remainder = $months % 12;
+
+    $parts = [];
+    if ($years > 0) {
+        $parts[] = $years . ' yr' . ($years > 1 ? 's' : '');
+    }
+    if ($remainder > 0) {
+        $parts[] = $remainder . ' mo' . ($remainder > 1 ? 's' : '');
+    }
+
+    return implode(' ', $parts);
+}

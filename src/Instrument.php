@@ -42,6 +42,14 @@ class Instrument
         return $stmt->fetchAll();
     }
 
+    /** Previously-used institution names, for autocompleting the field on the form. */
+    public static function distinctInstitutions(): array
+    {
+        return Database::connection()
+            ->query("SELECT DISTINCT institution FROM instruments WHERE institution <> '' ORDER BY institution ASC")
+            ->fetchAll(\PDO::FETCH_COLUMN);
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::connection()->prepare('SELECT * FROM instruments WHERE id = ?');

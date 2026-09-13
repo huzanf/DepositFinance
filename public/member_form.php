@@ -59,7 +59,7 @@ require __DIR__ . '/partials/header.php';
     <form method="post">
         <?= csrf_field() ?>
         <div class="form-row">
-            <label for="name">Name</label>
+            <label for="name">Name<?= req() ?></label>
             <input type="text" id="name" name="name" required value="<?= e($form['name']) ?>">
         </div>
         <div class="form-row">
